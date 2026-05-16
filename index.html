@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
+    <!-- PWA & Mobile App Instellingen -->
+    <meta name="theme-color" content="#007BC0"/>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Avenar Scan">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icon-192.png">
+
+    <title>Automatic Avenar Scan</title>
+
+    <!-- Modern Lettertype -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Het CSS design blijft hetzelfde als in de vorige versie */
+        :root {
+            --bosch-blue: #007BC0;
+            --bosch-green: #35A83A;
+            --light-gray: #f4f7fa;
+            --medium-gray: #e0e6ed;
+            --dark-gray: #555;
+            --text-color: #333;
+            --white: #fff;
+            --danger: #d93025;
+            --border-radius: 8px;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--white);
+            padding: 25px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: var(--bosch-blue);
+            text-align: center;
+            font-weight: 700;
+        }
+        h2 {
+            color: var(--text-color);
+            text-align: center;
+            font-weight: 700;
+            border-bottom: 1px solid var(--medium-gray);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        button, .button-like {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bosch-blue);
+            color: white !important;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+            box-sizing: border-box;
+            transition: background-color 0.2s ease, opacity 0.2s ease;
+        }
+        button:hover, .button-like:hover {
+            opacity: 0.9;
+        }
+        button.secondary, .button-like.secondary { background-color: var(--dark-gray); }
+        button.danger { background-color: var(--danger); }
+        button.export { background-color: var(--bosch-green); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        input[type="file"] { display: none; }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid var(--medium-gray);
+            border-radius: var(--border-radius);
+            background-color: var(--white);
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+        }
+        textarea { resize: vertical; }
+        .section {
+            display: none;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .section.active { display: block; }
+        #planCanvas, .photo-preview {
+            max-width: 100%;
+            border: 1px solid var(--medium-gray);
+            border-radius: var(--border-radius);
+            display: block;
+        }
+        #infoBox {
+            padding: 10px 15px;
+            background: #e9f5ff;
+            border-left: 5px solid var(--bosch-blue);
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        label {
+            font-weight: 500;
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    </style>
+    <!-- Script voor PDF-generatie (lokaal) -->
+    <script src="js/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container" id="app-container">
+        <h1>Automatic Avenar Scan</h1>
+        
+        <div id="projectSection" class="section active">
+            <h2>Project Setup</h2>
+            <div id="projectFields">
+                <label for="projectName">Projectnaam</label>
+                <input type="text" id="projectName" placeholder="bv. Hoofdkantoor De Toren">
+                
+                <div class="grid-2">
+                    <label for="planInput" class="button-like secondary">Kies Bouwplan</label>
+                    <input type="file" id="planInput" accept="image/jpeg,image/png">
+                    
+                    <label for="customerLogoInput" class="button-like secondary">Kies Klantlogo (Opt.)</label>
+                    <input type="file" id="customerLogoInput" accept="image/jpeg,image/png">
+                </div>
+                <img id="customerLogoPreview" class="photo-preview" style="display:none; margin-top:15px; max-height: 80px; width: auto;">
+
+                <button id="startProjectButton" style="margin-top: 20px;">Start Nieuw Project</button>
+                <label for="loadProjectInput" class="button-like">Laad Project (.json)</label>
+                <input type="file" id="loadProjectInput" accept=".json">
+            </div>
+        </div>
+        
+        <div id="manualInputSection" class="section"><h2 id="manualInputTitle">Stap 1: Component Registreren</h2><input type="hidden" id="editingIndex" value="-1"><label for="manualInput">Device ID</label><input type="text" id="manualInput" inputmode="numeric" pattern="[0-9-]*" placeholder="Typ of scan de ID..."><label for="detectorLabel">Detector Label / Naam (Optioneel)</label><input type="text" id="detectorLabel" placeholder="bv. Vergaderzaal 2.04"><label for="componentType">Component Type</label><select id="componentType"><option value="">Kies een type...</option><option value="FAP-425-O-R">FAP-425-O-R</option><option value="FAP-425-OT-R">FAP-425-OT-R</option><option value="FAP-425-DOT-R">FAP-425-DOT-R</option><option value="FAH-425-T-R">FAH-425-T-R</option><option value="FMC-420RW">FMC-420RW</option><option value="FLM-420-RLV8">FLM-420-RLV8</option><option value="FLM-420-I2">FLM-420-I2</option><option value="FNM-420-RD">FNM-420-RD</option><option value="FNM-420-BS">FNM-420-BS</option></select><label for="labelImageInput" class="button-like secondary">Maak Foto van Etiket</label><input type="file" id="labelImageInput" accept="image/*" capture="environment"><img id="labelImagePreview" class="photo-preview" style="display:none;max-height:100px;width:auto;margin-top:10px;"><button id="confirmManualButton">Ga Verder naar Plan</button></div>
+        <div id="pinSection" class="section"><h2>Stap 2: Pin Locatie & Documentatie</h2><div id="infoBox">Device ID: <strong id="planInfoCode"></strong></div><canvas id="planCanvas"></canvas><label for="connectionsImageInput" class="button-like secondary">Maak Foto van Aansluitingen</label><input type="file" id="connectionsImageInput" accept="image/*" capture="environment"><img id="connectionsImagePreview" class="photo-preview" style="display:none;max-height:100px;width:auto;margin-top:10px;"><label for="locationImageInput" class="button-like secondary">Maak Foto van Omgeving</label><input type="file" id="locationImageInput" accept="image/*" capture="environment"><img id="locationImagePreview" class="photo-preview" style="display:none;max-height:100px;width:auto;margin-top:10px;"><label for="opmerkingen">Extra Opmerkingen</label><textarea id="opmerkingen" rows="3" placeholder="Voeg hier opmerkingen toe..."></textarea><button id="saveButton" class="export">Sla Op & Registreer Volgende</button><button id="deleteButton" class="danger" style="display:none;">Verwijder Dit Component</button></div>
+        <div id="overviewSection" style="display:none;"><hr style="margin: 30px 0;"><h2>Geregistreerde Componenten</h2><p style="text-align: center; font-style: italic;">Klik op een rij om te bewerken.</p><div style="overflow-x:auto;"><table id="componentTable"><thead><tr><th>#</th><th>ID</th><th>Label</th><th>Type</th><th>Pin (X,Y)</th></tr></thead><tbody></tbody></table></div><div class="grid-2"><button id="saveProjectButton" class="export">Sla Project Op</button><button id="exportPdfCompactButton" class="export-pdf-compact">Exporteer Rapport</button></div><button id="exportPdfDetailedButton" class="export-pdf-detailed">Exporteer Uitgebreid Rapport</button></div>
+    </div>
+
+    <script>
+        // --- ELEMENTEN SELECTEREN & STATE MANAGEMENT ---
+        const sections = { project: document.getElementById('projectSection'), manualInput: document.getElementById('manualInputSection'), pin: document.getElementById('pinSection') };
+        const projectNameInput = document.getElementById("projectName");
+        const planInput = document.getElementById("planInput");
+        const customerLogoInput = document.getElementById("customerLogoInput");
+        const customerLogoPreview = document.getElementById("customerLogoPreview");
+        const startProjectButton = document.getElementById("startProjectButton");
+        const loadProjectInput = document.getElementById("loadProjectInput");
+        const manualInput = document.getElementById("manualInput");
+        const detectorLabelInput = document.getElementById("detectorLabel");
+        const componentTypeSelect = document.getElementById("componentType");
+        const labelImageInput = document.getElementById("labelImageInput");
+        const labelImagePreview = document.getElementById("labelImagePreview");
+        const confirmManualButton = document.getElementById("confirmManualButton");
+        const planInfoCode = document.getElementById("planInfoCode");
+        const planCanvas = document.getElementById("planCanvas");
+        const ctx = planCanvas.getContext("2d");
+        const connectionsImageInput = document.getElementById("connectionsImageInput");
+        const connectionsImagePreview = document.getElementById("connectionsImagePreview");
+        const locationImageInput = document.getElementById("locationImageInput");
+        const locationImagePreview = document.getElementById("locationImagePreview");
+        const opmerkingenInput = document.getElementById("opmerkingen");
+        const saveButton = document.getElementById("saveButton");
+        const deleteButton = document.getElementById("deleteButton");
+        const componentTableBody = document.querySelector("#componentTable tbody");
+        const saveProjectButton = document.getElementById("saveProjectButton");
+        const editingIndexInput = document.getElementById("editingIndex");
+        const manualInputTitle = document.getElementById("manualInputTitle");
+        const exportPdfCompactButton = document.getElementById("exportPdfCompactButton");
+        const exportPdfDetailedButton = document.getElementById("exportPdfDetailedButton");
+        const overviewSection = document.getElementById("overviewSection");
+
+        let currentItem = {};
+        let planImage = new Image(); // Dit is het object dat het bouwplan vasthoudt
+        let planImageDataUrl = '';
+        let customerLogoDataUrl = '';
+        let registeredItems = [];
+        const boschLogoDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAYFBMVEX///8zNTkAAAAzNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNTczNThpWUHAAAAH3RSTlMAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8ais5fAAABZklEQVR4nO3dy3KCQBSF0YJDWBDBVUHs//+tIeC1a3A3587MvTwozPAI8c4sC4IgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCILwD9lSLq/t6l5KxStl0s15N/vLpB3i25v3KVfLpF3i29t/y6Rdsrb+VumZdnPa+iOVdMre2k+UdMre2i+UdMne2i+UdMne2k+UdMne2i+UdMne2k+UdMne2i+UdMne2k+UdMne2i+UdMne2k+UdMne2i+UdMne2k+UdMne2k+UdMne2i+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+UdMne2k+U9P9QpWz3f+3fCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCIIgCMLf/gNTPzT8A79A5AAAAABJRU5ErkJggg==";
+
+        function fileToDataUrl(file) { return new Promise((resolve) => { if (!file) { resolve(null); return; } const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.readAsDataURL(file); }); }
+        
+        function showSection(sectionName) {
+            Object.values(sections).forEach(s => s.classList.remove('active'));
+            if (sections[sectionName]) sections[sectionName].classList.add('active');
+        }
+
+        // --- GECORRIGEERDE PROJECT LOGICA ---
+
+        startProjectButton.addEventListener('click', () => {
+            const projName = projectNameInput.value.trim();
+            const planFile = planInput.files[0];
+            if (!projName || !planFile) {
+                alert("Voer een projectnaam in en kies een bouwplan.");
+                return;
+            }
+            registeredItems = [];
+            updateComponentTable();
+            resetInputFields();
+
+            fileToDataUrl(planFile).then(dataUrl => {
+                planImageDataUrl = dataUrl;
+                planImage.src = planImageDataUrl; // *** DEZE REGEL WAS VERGETEN ***
+                planImage.onload = () => { // Wacht tot de afbeelding geladen is
+                    showSection('manualInput');
+                    manualInput.focus();
+                };
+            });
+        });
+        
+        customerLogoInput.addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                customerLogoDataUrl = await fileToDataUrl(e.target.files[0]);
+                customerLogoPreview.src = customerLogoDataUrl;
+                customerLogoPreview.style.display = 'block';
+            }
+        });
+
+        saveProjectButton.addEventListener('click', () => {
+            if (registeredItems.length === 0) return alert("Geen data om op te slaan.");
+            const projectData = {
+                projectName: projectNameInput.value.trim(),
+                planImageDataUrl: planImageDataUrl,
+                customerLogoDataUrl: customerLogoDataUrl,
+                registeredItems: registeredItems
+            };
+            const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `Project_${projectData.projectName.replace(/ /g, '_')}_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+
+        loadProjectInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const projectData = JSON.parse(event.target.result);
+                    projectNameInput.value = projectData.projectName;
+                    planImageDataUrl = projectData.planImageDataUrl;
+                    customerLogoDataUrl = projectData.customerLogoDataUrl;
+                    
+                    if (customerLogoDataUrl) {
+                        customerLogoPreview.src = customerLogoDataUrl;
+                        customerLogoPreview.style.display = 'block';
+                    } else {
+                        customerLogoPreview.style.display = 'none';
+                    }
+                    
+                    registeredItems = projectData.registeredItems;
+                    updateComponentTable();
+                    resetInputFields();
+
+                    planImage.src = planImageDataUrl; // *** DEZE REGEL WAS HIER OOK VERGETEN ***
+                    planImage.onload = () => {
+                        showSection('manualInput');
+                    };
+
+                } catch (error) {
+                    alert('Fout bij het laden van het projectbestand.');
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+            loadProjectInput.value = null;
+        });
+
+        // --- GECORRIGEERDE "VERDER NAAR PLAN" KNOP LOGICA ---
+
+        confirmManualButton.addEventListener('click', async () => {
+            const id = manualInput.value.trim();
+            if (!id) {
+                alert("Voer een Device ID in.");
+                return;
+            }
+
+            currentItem.deviceId = id;
+            currentItem.detectorLabel = detectorLabelInput.value;
+            currentItem.componentType = componentTypeSelect.value;
+            
+            if (labelImageInput.files[0]) {
+                currentItem.labelImageDataUrl = await fileToDataUrl(labelImageInput.files[0]);
+            } else if (editingIndexInput.value === "-1") {
+                delete currentItem.labelImageDataUrl;
+            }
+            
+            planInfoCode.innerText = id;
+
+            // Deze code werkt nu weer omdat planImage.src correct is ingesteld
+            planCanvas.width = planImage.naturalWidth;
+            planCanvas.height = planImage.naturalHeight;
+            ctx.drawImage(planImage, 0, 0);
+
+            showSection('pin');
+        });
+
+        // --- REST VAN DE JAVASCRIPT ---
+        // (De overige functies voor opslaan, tekenen, PDF's etc. blijven ongewijzigd)
+        planCanvas.addEventListener("click",t=>{const e=planCanvas.getBoundingClientRect(),r=planCanvas.width/e.width,n=planCanvas.height/e.height;currentItem.pin={x:(t.clientX-e.left)*r,y:(t.clientY-e.top)*n};planCanvas.width=planImage.naturalWidth,planCanvas.height=planImage.naturalHeight,ctx.drawImage(planImage,0,0),ctx.beginPath(),ctx.arc(currentItem.pin.x,currentItem.pin.y,15,0,2*Math.PI,!1),ctx.fillStyle="rgba(255, 0, 0, 0.7)",ctx.fill(),ctx.lineWidth=3,ctx.strokeStyle="white",ctx.stroke()}),handleImageInputChange(labelImageInput,labelImagePreview,"labelImageDataUrl"),handleImageInputChange(connectionsImageInput,connectionsImagePreview,"connectionsImageDataUrl"),handleImageInputChange(locationImageInput,locationImagePreview,"locationImageDataUrl"),saveButton.addEventListener("click",async()=>{if(!currentItem.pin)return alert("Plaats eerst een pin op het plan.");currentItem.opmerkingen=opmerkingenInput.value;const t=parseInt(editingIndexInput.value,10);t>-1?registeredItems[t]=currentItem:registeredItems.push(currentItem),updateComponentTable(),resetInputFields(),showSection("manualInput"),manualInput.focus()}),deleteButton.addEventListener("click",()=>{const t=parseInt(editingIndexInput.value,10);t>-1&&confirm(`Weet je zeker dat je component #${t+1} wilt verwijderen?`)&&(registeredItems.splice(t,1),updateComponentTable(),resetInputFields(),showSection("manualInput"))});function resetInputFields(){[manualInput,detectorLabelInput,opmerkingenInput].forEach(t=>t.value=""),[labelImageInput,connectionsImageInput,locationImageInput].forEach(t=>t.value=null),[labelImagePreview,connectionsImagePreview,locationImagePreview].forEach(t=>{t.src="#",t.style.display="none"}),componentTypeSelect.selectedIndex=0,editingIndexInput.value="-1",manualInputTitle.innerText="Stap 1: Component Registreren",saveButton.innerText="Sla Op & Registreer Volgende",deleteButton.style.display="none",currentItem={}}function populateInputsWithItem(t){manualInput.value=t.deviceId||"",detectorLabelInput.value=t.detectorLabel||"",componentTypeSelect.value=t.componentType||"",opmerkingenInput.value=t.opmerkingen||"",[labelImagePreview,connectionsImagePreview,locationImagePreview].forEach(t=>{t.src="#",t.style.display="none"}),t.labelImageDataUrl&&(labelImagePreview.src=t.labelImageDataUrl,labelImagePreview.style.display="block"),t.connectionsImageDataUrl&&(connectionsImagePreview.src=t.connectionsImageDataUrl,connectionsImagePreview.style.display="block"),t.locationImageDataUrl&&(locationImagePreview.src=t.locationImageDataUrl,locationImagePreview.style.display="block")}
+        function updateComponentTable(){componentTableBody.innerHTML="",registeredItems.forEach((t,e)=>{const r=componentTableBody.insertRow();r.dataset.index=e,r.innerHTML=`<td>${e+1}</td><td>${t.deviceId}</td><td>${t.detectorLabel}</td><td>${t.componentType}</td><td>(${Math.round(t.pin.x)}, ${Math.round(t.pin.y)})</td>`,r.addEventListener("click",()=>editItem(e))}),overviewSection.style.display=registeredItems.length>0?"block":"none"}function editItem(t){currentItem={...registeredItems[t]},editingIndexInput.value=t,populateInputsWithItem(currentItem),manualInputTitle.innerText=`Component #${t+1} Bewerken`,saveButton.innerText="Wijzigingen Opslaan",deleteButton.style.display="block",showSection("manualInput"),document.querySelectorAll("#componentTable tbody tr").forEach(t=>t.classList.remove("editing")),document.querySelector(`#componentTable tbody tr[data-index='${t}']`).classList.add("editing")}
+        function handleImageInputChange(t,e,r){t.addEventListener("change",async n=>{if(n.target.files[0]){const o=await fileToDataUrl(n.target.files[0]);currentItem[r]=o,e.src=o,e.style.display="block"}})}
+        function getReportHeaderHtml(){return`\n                <div class="header">\n                    ${customerLogoDataUrl?`<img src="${customerLogoDataUrl}" class="logo customer-logo">`:"<div></div>"}\n                    <img src="${boschLogoDataUrl}" class="logo bosch-logo">\n                </div>\n            `}
+        function generateCompactReportHtml(t){const e=(new Date).toLocaleDateString("nl-BE"),r=projectNameInput.value.trim(),n=getReportHeaderHtml(),o=`<div class="page">${n}<h1>Project Overzicht: ${r}</h1><p class="date">Datum: ${e}</p><div class="plan-container"><img src="${t}"></div></div>`,i=registeredItems.map((t,e)=>`<tr><td>${e+1}</td><td>${t.deviceId}</td><td>${t.detectorLabel||""}</td><td>${t.componentType||""}</td><td class="opmerking-cell">${t.opmerkingen||""}</td><td class="photo-cell">${t.labelImageDataUrl?`<img src="${t.labelImageDataUrl}">`:""}${t.connectionsImageDataUrl?`<img src="${t.connectionsImageDataUrl}">`:""}${t.locationImageDataUrl?`<img src="${t.locationImageDataUrl}">`:""}</td></tr>`).join(""),a=`<div class="page">${n}<h2>Componentenlijst</h2><table class="report-table"><thead><tr><th>#</th><th>Device ID</th><th>Label</th><th>Type</th><th>Opmerkingen</th><th>Foto's</th></tr></thead><tbody>${i}</tbody></table></div>`;return`<!DOCTYPE html><html><head><title>Rapport</title><style>\n                body { font-family: Arial, sans-serif; color: #333; }\n                .page { page-break-after: always; padding: 1.5cm; position: relative; width: 100%; height: 210mm; box-sizing: border-box; }\n                .page:last-child { page-break-after: auto; }\n                .header { display: flex; justify-content: space-between; align-items: center; position: absolute; top: 0.5cm; left: 1.5cm; right: 1.5cm; height: 30px;}\n                .logo { max-height: 100%; width: auto; }\n                h1, h2 { color: #005a9c; text-align: center; margin-top: 40px; } .date {text-align:center; font-size:10pt; color:#666;}\n                .plan-container img { max-width: 100%; max-height: 15cm; }\n                .report-table { width: 100%; border-collapse: collapse; margin-top: 1cm; }\n                .report-table th, .report-table td { border: 1px solid #ccc; padding: 6px; font-size: 8pt; vertical-align: top; }\n                .report-table th { background-color: #f2f2f2; } .report-table tr { page-break-inside: avoid; }\n                .photo-cell img { height: 40px; border: 1px solid #ddd; }\n            </style></head><body>${o}${a}</body></html>`}
+        function generateDetailedReportHtml(t){const e=(new Date).toLocaleDateString("nl-BE"),r=projectNameInput.value.trim(),n=getReportHeaderHtml(),o=`<div class="page">${n}<h1>Uitgebreid Rapport: ${r}</h1><p class="date">Datum: ${e}</p><div class="plan-container"><img src="${t}"></div></div>`,i=registeredItems.map((t,e)=>`<div class="page">${n}<h2>Component #${e+1}: ${t.deviceId}</h2><table class="detail-table"><tr><th>Label / Locatie</th><td>${t.detectorLabel||"N/A"}</td></tr><tr><th>Component Type</th><td>${t.componentType||"N/A"}</td></tr><tr><th>Opmerkingen</th><td>${t.opmerkingen||"Geen opmerkingen"}</td></tr></table><div class="photo-grid">${t.labelImageDataUrl?`<div><h3>Foto Etiket</h3><img src="${t.labelImageDataUrl}"></div>`:""}${t.connectionsImageDataUrl?`<div><h3>Foto Aansluitingen</h3><img src="${t.connectionsImageDataUrl}"></div>`:""}${t.locationImageDataUrl?`<div><h3>Foto Omgeving</h3><img src="${t.locationImageDataUrl}"></div>`:""}</div></div>`).join("");return`<!DOCTYPE html><html><head><title>Uitgebreid Rapport</title><style>body{font-family:Arial,sans-serif;color:#333}.page{page-break-after:always;padding:2cm;position:relative;width:100%;min-height:297mm;box-sizing:border-box}.page:last-child{page-break-after:auto}.header{display:flex;justify-content:space-between;align-items:center;position:absolute;top:1cm;left:2cm;right:2cm;height:40px}.logo{max-height:100%;width:auto}h1,h2,h3{color:#005a9c;text-align:center;margin-top:50px}h2{font-size:18pt;border-bottom:2px solid #005a9c;padding-bottom:5px;margin-bottom:.8cm}h3{font-size:13pt;margin-bottom:5px;text-align:left}.date{text-align:center;font-size:10pt;color:#666;margin-top:-10px}.plan-container{margin-top:1cm;text-align:center}.plan-container img{max-width:100%;max-height:20cm}.detail-table{width:100%;border-collapse:collapse;margin-bottom:1cm;page-break-inside:avoid}.detail-table th,.detail-table td{border:1px solid #ccc;padding:10px;font-size:11pt;text-align:left;vertical-align:top}.detail-table th{background-color:#f2f2f2;width:150px;font-weight:700}.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;page-break-inside:avoid}.photo-grid div{text-align:left;page-break-inside:avoid}.photo-grid img{width:100%;height:auto;max-height:180px;object-fit:cover;border:1px solid #ddd;border-radius:4px}</style></head><body>${o}${i}</body></html>`}
+        function createPlanWithPinsDataUrl(){const t=document.createElement("canvas"),e=t.getContext("2d");return t.width=planImage.naturalWidth,t.height=planImage.naturalHeight,e.drawImage(planImage,0,0),registeredItems.forEach((t,r)=>{const n=t.pin.x,o=t.pin.y;e.beginPath(),e.arc(n,o,20,0,2*Math.PI,!1),e.fillStyle="red",e.fill(),e.lineWidth=3,e.strokeStyle="white",e.stroke(),e.font="bold 24px sans-serif",e.fillStyle="white",e.textAlign="center",e.textBaseline="middle",e.fillText(r+1,n,o)}),t.toDataURL("image/jpeg",.9)}
+        function generatePdf(t,e,r){if(0===registeredItems.length)return alert("Geen items te exporteren.");const n=t.innerText;t.disabled=!0,t.innerText="PDF genereren...";const o=document.createElement("div");o.innerHTML=e,"undefined"==typeof html2pdf?(alert("PDF module is niet geladen. Doe een 'harde verversing' (Ctrl+Shift+R) en probeer opnieuw."),t.disabled=!1,t.innerText=n,void 0):html2pdf().from(o).set(r).save().then(()=>{t.disabled=!1,t.innerText=n}).catch(e=>{console.error("PDF generatie mislukt:",e),alert("Er is een fout opgetreden bij het genereren van de PDF."),t.disabled=!1,t.innerText=n})}
+        exportPdfCompactButton.addEventListener("click",()=>{const t=createPlanWithPinsDataUrl(),e=generateCompactReportHtml(t),r={margin:0,filename:`Rapport_Compact_${projectNameInput.value.trim()}_${new Date().toISOString().slice(0,10)}.pdf`,image:{type:"jpeg",quality:.95},html2canvas:{scale:2,useCORS:!0,logging:!1},jsPDF:{unit:"mm",format:"a4",orientation:"landscape",margin:15}};generatePdf(exportPdfCompactButton,e,r)}),exportPdfDetailedButton.addEventListener("click",()=>{const t=createPlanWithPinsDataUrl(),e=generateDetailedReportHtml(t),r={margin:0,filename:`Rapport_Uitgebreid_${projectNameInput.value.trim()}_${new Date().toISOString().slice(0,10)}.pdf`,image:{type:"jpeg",quality:.95},html2canvas:{scale:2,useCORS:!0,logging:!1},jsPDF:{unit:"mm",format:"a4",orientation:"portrait",margin:20}};generatePdf(exportPdfDetailedButton,e,r)}),showSection("project");
+        if("serviceWorker"in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("./service-worker.js").then(t=>{console.log("ServiceWorker registratie succesvol: ",t.scope)},t=>{console.log("ServiceWorker registratie mislukt: ",t)})});
+    </script>
+</body>
+</html>
